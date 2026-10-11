@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Enhancer &amp; Resolution Converter</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --line:#262d38; --txt:#e6edf3;
+    --mut:#8b98a9; --acc:#3b82f6; --ok:#22c55e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:17px;font-weight:600}
+  header p{margin:3px 0 0;color:var(--mut);font-size:12.5px}
+  .wrap{display:grid;grid-template-columns:370px minmax(0,1fr);gap:16px;padding:16px;align-items:start}
+  @media(max-width:960px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);
+     margin:16px 0 8px;font-weight:600}
+  h2:first-of-type{margin-top:12px}
+  label{display:block;font-size:12.5px;color:var(--mut);margin-bottom:4px}
+  input[type=number],select{width:100%;background:#0d1219;color:var(--txt);
+     border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px}
+  input[type=range]{width:100%;accent-color:var(--acc);margin:2px 0 0}
+  .row{display:flex;gap:8px;align-items:center}
+  .row>*{flex:1}
+  .row .mid{flex:0 0 auto;color:var(--mut)}
+  .ctl{margin-bottom:11px}
+  .ctl .lab{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut)}
+  .ctl output{color:var(--txt);font-variant-numeric:tabular-nums}
+  .drop{display:block;text-align:center;border:1px dashed #35405180;border-radius:10px;
+        padding:14px;cursor:pointer;color:var(--txt);background:#0d1219}
+  .drop:hover{border-color:var(--acc)}
+  .meta{font-size:12px;color:var(--mut);margin-top:9px;word-break:break-word}
+  .chk{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:12.5px;
+       margin:0;white-space:nowrap;flex:0 0 auto}
+  button{width:100%;padding:10px;border:0;border-radius:9px;font:inherit;font-weight:600;
+         cursor:pointer;margin-top:12px;background:var(--acc);color:#fff}
+  button.ghost{background:#0d1219;color:var(--txt);border:1px solid var(--line)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  fieldset{border:0;padding:0;margin:0}
+  fieldset:disabled{opacity:.5;pointer-events:none}
+  #canvas{width:100%;display:block;border-radius:10px;background:#000}
+  .transport{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .transport button{width:auto;margin:0;padding:7px 14px;flex:0 0 auto}
+  .transport input[type=range]{flex:1}
+  .time{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .bar{height:7px;background:#0d1219;border-radius:99px;overflow:hidden;margin-top:12px}
+  .bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .15s}
+  .status{font-size:12.5px;color:var(--mut);margin-top:7px;min-height:18px}
+  .srconly{position:absolute;width:1px;height:1px;clip:rect(0 0 0 0);overflow:hidden}
+  a.dl{display:block;margin-top:12px;padding:11px;text-align:center;border-radius:9px;
+       background:#12261a;border:1px solid #1e4a2c;color:#8ef0ad;text-decoration:none;font-weight:600}
+  .note{font-size:11.5px;color:var(--mut);margin-top:10px;line-height:1.45}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Video Enhancer &amp; Resolution Converter</h1>
+  <p>100% client-side — your video is decoded, scaled and re-encoded in your browser. Nothing is uploaded.</p>
+</header>
+
+<div class="wrap">
+  <aside class="panel">
+    <label class="drop" for="file">Choose a video file…
+      <input id="file" type="file" accept="video/*" hidden>
+    </label>
+    <div class="meta" id="meta">No file loaded.</div>
+
+    <fieldset id="settings" disabled>
+      <h2>Output resolution</h2>
+      <select id="resPreset">
+        <option value="source">Same as source</option>
+        <option value="3840">4K · 2160p</option>
+        <option value="1440">QHD · 1440p</option>
+        <option value="1080" selected>Full HD · 1080p</option>
+        <option value="720">HD · 720p</option>
+        <option value="480">SD · 480p</option>
+        <option value="360">360p</option>
+        <option value="custom">Custom</option>
+      </select>
+      <div class="row" style="margin-top:8px">
+        <input id="outW" type="number" min="16" max="7680" step="2" value="1920">
+        <span class="mid">×</span>
+        <input id="outH" type="number" min="16" max="4320" step="2" value="1080">
+        <label class="chk"><input type="checkbox" id="lockAspect" checked> lock</label>
+      </div>
+
+      <h2>Enhancement</h2>
+      <div class="ctl"><div class="lab"><span>Sharpen</span><output id="o_sharpen">0.60</output></div>
+        <input id="sharpen" type="range" min="0" max="2" step="0.05" value="0.6"></div>
+      <div class="ctl"><div class="lab"><span>Denoise</span><output id="o_denoise">0.00</output></div>
+        <input id="denoise" type="range" min="0" max="1" step="0.05" value="0"></div>
+      <div class="ctl"><div class="lab"><span>Brightness</span><output id="o_bright">0.00</output></div>
+        <input id="bright" type="range" min="-0.3" max="0.3" step="0.01" value="0"></div>
+      <div class="ctl"><div class="lab"><span>Contrast</span><output id="o_contrast">1.00</output></div>
+        <input id="contrast" type="range" min="0.5" max="1.8" step="0.01" value="1"></div>
+      <div class="ctl"><div class="lab"><span>Saturation</span><output id="o_sat">1.00</output></div>
+        <input id="sat" type="range" min="0" max="2" step="0.05" value="1"></div>
+      <div class="ctl"><div class="lab"><span>Gamma</span><output id="o_gamma">1.00</output></div>
+        <input id="gamma" type="range" min="0.6" max="1.6" step="0.02" value="1"></div>
+
+      <h2>Quality &amp; encoding</h2>
+      <label for="qpreset">Quality preset</label>
+      <select id="qpreset">
+        <option value="0.05">Low — small file</option>
+        <option value="0.09" selected>Medium — balanced</option>
+        <option value="0.16">High</option>
+        <option value="0.26">Very high — archival</option>
+      </select>
+
+      <div class="row" style="margin-top:9px;align-items:flex-end">
+        <div style="flex:1">
+          <label for="bitrate">Video bitrate (Mbps)</label>
+          <input id="bitrate" type="number" min="0.2" max="200" step="0.1" value="8">
+        </div>
+        <label class="chk" style="padding-bottom:9px"><input type="checkbox" id="autoBr" checked> auto</label>
+      </div>
+
+      <div class="row" style="margin-top:9px">
+        <div>
+          <label for="fps">Frame rate</label>
+          <select id="fps">
+            <option value="source">Source</option>
+            <option value="24">24 fps</option>
+            <option value="30" selected>30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
+        </div>
+        <div>
+          <label for="format">Container</label>
+          <select id="format"></select>
+        </div>
+      </div>
+
+      <div class="note">Tip: upscaling can't invent detail that was never recorded. A moderate
+        sharpen + denoise pass and a high bitrate at 1.5–2× the source resolution give the
+        best visible gain.</div>
+    </fieldset>
+
+    <button id="export" disabled>Export video</button>
+    <button id="cancel" class="ghost" disabled>Cancel</button>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="status" id="status">Load a file to begin.</div>
+    <div id="dl"></div>
+  </aside>
+
+  <main class="panel">
+    <video id="src" class="srconly" playsinline></video>
+    <canvas id="canvas" width="1280" height="720"></canvas>
+    <div class="transport">
+      <button id="play" class="ghost" disabled>Play</button>
+      <input id="seek" type="range" min="0" max="1000" value="0" disabled>
+      <span class="time" id="time">0:00 / 0:00</span>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const video = $('src'), canvas = $('canvas'), fileIn = $('file'), meta = $('meta');
+const statusEl = $('status'), bar = $('bar'), dlBox = $('dl');
+const btnExport = $('export'), btnCancel = $('cancel'), btnPlay = $('play');
+const seek = $('seek'), settings = $('settings');
+
+const VS = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main(){ vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+const FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2 uTexel;
+uniform float uSharpen, uDenoise, uBright, uContrast, uSat, uGamma;
+vec3 tap(vec2 o){ return texture2D(uTex, vUv + o * uTexel).rgb; }
+void main(){
+  vec3 c = tap(vec2(0.0));
+  if (uDenoise > 0.001) {
+    vec3 b = tap(vec2(-1.,-1.)) + tap(vec2(0.,-1.)) + tap(vec2(1.,-1.))
+      + tap(vec2(-1.,0.)) + c + tap(vec2(1.,0.))
+      + tap(vec2(-1.,1.)) + tap(vec2(0.,1.)) + tap(vec2(1.,1.));
+    c = mix(c, b / 9.0, uDenoise);
+  }
+  if (uSharpen > 0.001) {
+    vec3 b = c * 4.0
+      + (tap(vec2(-1.,0.)) + tap(vec2(1.,0.)) + tap(vec2(0.,-1.)) + tap(vec2(0.,1.))) * 2.0
+      + tap(vec2(-1.,-1.)) + tap(vec2(1.,-1.)) + tap(vec2(-1.,1.)) + tap(vec2(1.,1.));
+    b /= 16.0;
+    c = c + (c - b) * uSharpen;
+  }
+  c = (c - 0.5) * uContrast + 0.5 + uBright;
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(vec3(l), c, uSat);
+  c = clamp(c, 0.0, 1.0);
+  c = pow(c, vec3(1.0 / uGamma));
+  gl_FragColor = vec4(c, 1.0);
+}
+`;
+
+let gl = null, prog = null, tex = null, U = {}, useGL = false;
+function initGL(){
+  const opts = {alpha:false, antialias:false, preserveDrawingBuffer:false, depth:false, stencil:false};
+  gl = canvas.getContext('webgl', opts) || canvas.getContext('experimental-webgl', opts);
+  if (!gl) return false;
+  const compile = (type, src) => {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  };
+  try {
+    prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  } catch (e) { console.warn('WebGL unavailable, falling back to 2D canvas:', e); gl = null; return false; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  U = {
+    texel:gl.getUniformLocation(prog,'uTexel'), sharpen:gl.getUniformLocation(prog,'uSharpen'),
+    denoise:gl.getUniformLocation(prog,'uDenoise'), bright:gl.getUniformLocation(prog,'uBright'),
+    contrast:gl.getUniformLocation(prog,'uContrast'), sat:gl.getUniformLocation(prog,'uSat'),
+    gamma:gl.getUniformLocation(prog,'uGamma'), tex:gl.getUniformLocation(prog,'uTex')
+  };
+  gl.uniform1i(U.tex, 0); return true;
+}
+function render(){
+  if (video.readyState < 2) return;
+  if (useGL) {
+    gl.viewport(0,0,canvas.width,canvas.height); gl.useProgram(prog);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video);
+    gl.uniform2f(U.texel,1/video.videoWidth,1/video.videoHeight);
+    gl.uniform1f(U.sharpen,+$('sharpen').value); gl.uniform1f(U.denoise,+$('denoise').value);
+    gl.uniform1f(U.bright,+$('bright').value); gl.uniform1f(U.contrast,+$('contrast').value);
+    gl.uniform1f(U.sat,+$('sat').value); gl.uniform1f(U.gamma,+$('gamma').value);
+    gl.drawArrays(gl.TRIANGLES,0,6);
+  } else {
+    const ctx = canvas.getContext('2d');
+    const b = +$('bright').value, c = +$('contrast').value, s = +$('sat').value, g = +$('gamma').value;
+    ctx.save(); ctx.filter = `brightness(${1+b}) contrast(${c}) saturate(${s}) blur(0px) brightness(1)`;
+    ctx.drawImage(video,0,0,canvas.width,canvas.height); ctx.restore();
+    if (g !== 1) {
+      const px = ctx.getImageData(0,0,canvas.width,canvas.height), d = px.data, inv = 1/g;
+      const lut = new Uint8ClampedArray(256);
+      for(let i=0;i<256;i++) lut[i]=Math.pow(i/255,inv)*255;
+      for(let i=0;i<d.length;i+=4){d[i]=lut[d[i]];d[i+1]=lut[d[i+1]];d[i+2]=lut[d[i+2]];}
+      ctx.putImageData(px,0,0);
+    }
+  }
+}
+let looping = false;
+function loop(){ render(); if(!video.paused&&!video.ended){syncTime();requestAnimationFrame(loop);}else looping=false; }
+function startLoop(){if(looping)return;looping=true;requestAnimationFrame(loop);}
+
+let srcAR=16/9;
+fileIn.addEventListener('change', async e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f)return;
+  dlBox.innerHTML=''; video.src=URL.createObjectURL(f); video.load();
+  await new Promise(res=>video.addEventListener('loadedmetadata',res,{once:true}));
+  if(!isFinite(video.duration)){
+    await new Promise(res=>{
+      const done=()=>res(); video.addEventListener('seeked',done,{once:true});
+      video.currentTime=1e101; setTimeout(done,1500);
+    });
+    video.currentTime=0;
+  }
+  srcAR=video.videoWidth/video.videoHeight||16/9;
+  meta.textContent=`${f.name} — ${video.videoWidth}×${video.videoHeight}, ${fmtTime(video.duration)}, ${(f.size/1048576).toFixed(1)} MB`+(useGL?'':'  ⚠︎ GPU filters off (2D fallback)');
+  $('resPreset').value='source'; $('outW').value=video.videoWidth; $('outH').value=video.videoHeight;
+  settings.disabled=false; btnPlay.disabled=false; btnExport.disabled=false; seek.disabled=false;
+  statusEl.textContent='Ready. Adjust settings — the preview updates live.';
+  applyResolution(); refreshBitrate(); syncTime(); render();
+});
+
+function applyResolution(){
+  let h=+$('outH').value,w=+$('outW').value;if(!w||!h)return;
+  w=Math.max(16,Math.round(w/2)*2);h=Math.max(16,Math.round(h/2)*2);
+  $('outW').value=w;$('outH').value=h;canvas.width=w;canvas.height=h;refreshBitrate();render();
+}
+$('resPreset').addEventListener('change',e=>{
+  const v=e.target.value;if(v==='custom')return;
+  const h=v==='source'?video.videoHeight:+v;if(!h)return;
+  const w=Math.round((h*srcAR)/2)*2;$('outH').value=h;$('outW').value=w;applyResolution();
+});
+$('outW').addEventListener('input',()=>{
+  if($('lockAspect').checked)$('outH').value=Math.max(16,Math.round((+$('outW').value/srcAR)/2)*2);
+  $('resPreset').value='custom';applyResolution();
+});
+$('outH').addEventListener('input',()=>{
+  if($('lockAspect').checked)$('outW').value=Math.max(16,Math.round((+$('outH').value*srcAR)/2)*2);
+  $('resPreset').value='custom';applyResolution();
+});
+function currentFps(){const v=$('fps').value;return v==='source'?30:+v;}
+function refreshBitrate(){
+  if(!$('autoBr').checked)return;
+  const bits=canvas.width*canvas.height*currentFps()*+$('qpreset').value;
+  $('bitrate').value=(bits/1e6).toFixed(1);
+}
+$('qpreset').addEventListener('change',refreshBitrate);
+$('fps').addEventListener('change',refreshBitrate);
+$('autoBr').addEventListener('change',e=>{$('bitrate').readOnly=e.target.checked;refreshBitrate();});
+$('bitrate').readOnly=true;
+
+['sharpen','denoise','bright','contrast','sat','gamma'].forEach(id=>{
+  const input=$(id),out=$('o_'+id),fmt=v=>(+v).toFixed(2);
+  out.textContent=fmt(input.value);
+  input.addEventListener('input',()=>{out.textContent=fmt(input.value);render();});
+  input.addEventListener('dblclick',()=>{input.value=input.defaultValue;out.textContent=fmt(input.value);render();});
+});
+function fmtTime(t){
+  if(!isFinite(t)||t<0)t=0;
+  const m=Math.floor(t/60),s=Math.floor(t%60);return `${m}:${String(s).padStart(2,'0')}`;
+}
+function syncTime(){
+  if(isFinite(video.duration)&&video.duration>0){
+    seek.value=(video.currentTime/video.duration)*1000;
+    $('time').textContent=`${fmtTime(video.currentTime)} / ${fmtTime(video.duration)}`;
+  }
+}
+btnPlay.addEventListener('click',()=>{if(video.paused)video.play();else video.pause();});
+video.addEventListener('play',()=>{btnPlay.textContent='Pause';startLoop();});
+video.addEventListener('pause',()=>{btnPlay.textContent='Play';render();});
+video.addEventListener('timeupdate',syncTime);video.addEventListener('seeked',render);
+seek.addEventListener('input',()=>{if(isFinite(video.duration))video.currentTime=(seek.value/1000)*video.duration;});
+
+const MIME_CANDIDATES=[
+  ['MP4 (H.264)','video/mp4;codecs="avc1.640028,mp4a.40.2"','mp4'],
+  ['WebM (VP9)','video/webm;codecs=vp9,opus','webm'],
+  ['WebM (VP8)','video/webm;codecs=vp8,opus','webm'],
+  ['WebM','video/webm','webm']
+];
+function buildFormatList(){
+  const sel=$('format');sel.innerHTML='';if(!window.MediaRecorder)return;
+  MIME_CANDIDATES.forEach(([label,mime,ext])=>{
+    if(MediaRecorder.isTypeSupported(mime)){
+      const o=document.createElement('option');o.value=mime;o.dataset.ext=ext;o.textContent=label;sel.appendChild(o);
+    }
+  });
+  if(!sel.options.length){const o=document.createElement('option');o.textContent='Not supported in this browser';sel.appendChild(o);}
+}
+let audioCtx=null,mediaSrcNode=null,audioDest=null;
+function ensureAudio(){
+  try{
+    if(!audioCtx){
+      audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+      mediaSrcNode=audioCtx.createMediaElementSource(video);audioDest=audioCtx.createMediaStreamDestination();
+      mediaSrcNode.connect(audioDest);mediaSrcNode.connect(audioCtx.destination);
+    }
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    return audioDest.stream.getAudioTracks();
+  }catch(err){console.warn('Audio capture unavailable:',err);return[];}
+}
+let recorder=null,chunks=[],exporting=false,tickTimer=null;
+btnExport.addEventListener('click',async()=>{
+  if(exporting||!video.videoWidth)return;
+  const mime=$('format').value;
+  if(!mime||!window.MediaRecorder){statusEl.textContent='MediaRecorder is not supported in this browser.';return;}
+  applyResolution();const fps=currentFps(),bitrate=Math.max(200000,Math.round((+$('bitrate').value)*1e6));
+  chunks=[];exporting=true;btnExport.disabled=true;btnCancel.disabled=false;settings.disabled=true;
+  dlBox.innerHTML='';bar.style.width='0%';statusEl.textContent='Preparing…';video.muted=false;
+  if($('autoBr').checked)refreshBitrate();
+  try{
+    const stream=canvas.captureStream(fps);ensureAudio().forEach(t=>stream.addTrack(t));
+    const opts={videoBitsPerSecond:bitrate,audioBitsPerSecond:128000};
+    try{recorder=new MediaRecorder(stream,Object.assign({mimeType:mime},opts));}
+    catch{recorder=new MediaRecorder(stream,opts);}
+    recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    recorder.onstop=()=>{
+      clearInterval(tickTimer);exporting=false;settings.disabled=false;btnCancel.disabled=true;btnExport.disabled=false;bar.style.width='100%';
+      const ext=MIME_CANDIDATES.find(m=>m[1]===mime)?.[2]||'webm';
+      const blob=new Blob(chunks,{type:mime.split(';')[0]}),url=URL.createObjectURL(blob);
+      const base=(fileIn.files[0]?.name||'video').replace(/\.[^.]+$/,'');
+      const a=document.createElement('a');a.className='dl';a.href=url;
+      a.download=`${base}_${canvas.width}x${canvas.height}.${ext}`;
+      a.textContent=`⬇ Download ${canvas.width}×${canvas.height} · ${(blob.size/1048576).toFixed(1)} MB`;
+      dlBox.appendChild(a);statusEl.textContent='Done.';
+    };
+    recorder.start(1000);video.currentTime=0;await video.play();startLoop();
+    tickTimer=setInterval(()=>{
+      if(!isFinite(video.duration)||video.duration<=0)return;
+      const p=Math.min(1,video.currentTime/video.duration);bar.style.width=(p*100).toFixed(1)+'%';
+      statusEl.textContent=`Encoding ${canvas.width}×${canvas.height} @ ${fps}fps, ${(bitrate/1e6).toFixed(1)} Mbps — ${fmtTime(video.currentTime)} / ${fmtTime(video.duration)}`;
+    },200);
+    video.addEventListener('ended',stopExport,{once:true});
+  }catch(err){
+    console.error(err);statusEl.textContent='Export failed: '+err.message;exporting=false;
+    settings.disabled=false;btnCancel.disabled=true;btnExport.disabled=false;
+  }
+});
+function stopExport(){
+  if(!exporting)return;exporting=false;
+  try{recorder&&recorder.state!=='inactive'&&recorder.stop();}catch{}
+  video.pause();
+}
+btnCancel.addEventListener('click',()=>{
+  clearInterval(tickTimer);video.removeEventListener('ended',stopExport);stopExport();statusEl.textContent='Cancelled.';
+});
+useGL=initGL();
+if(!useGL){canvas.getContext('2d');$('sharpen').disabled=true;$('denoise').disabled=true;}
+buildFormatList();
+statusEl.textContent=window.MediaRecorder?'Load a file to begin.':'This browser cannot record video (MediaRecorder missing).';
+</script>
+</body>
+</html>
